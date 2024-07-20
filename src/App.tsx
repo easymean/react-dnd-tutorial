@@ -6,7 +6,7 @@ import { DropArea } from "./DropArea";
 function App() {
   const [list, setList] = useState<string[]>([]);
   const addList = () => {
-    const randomId = crypto.randomUUID();
+    const randomId = list.length.toString();
     const newList = [...list, randomId];
     setList(newList);
   };

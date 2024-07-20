@@ -1,16 +1,20 @@
 import "./droparea.scss";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 
 type Props = {
   children?: React.ReactNode;
   direction?: "horizontal" | "vertical";
   boundaryMargin?: number;
+  orderedList?: any[];
+  onChange?: (orderedIds: string[]) => void;
 };
 
 export const DropArea = ({
   children,
   direction = "vertical",
   boundaryMargin = 0,
+  orderedList = [],
+  onChange,
 }: Props) => {
   const areaRef = useRef<HTMLUListElement>(null);
   const ghostRef = useRef<HTMLElement>();
@@ -37,46 +41,6 @@ export const DropArea = ({
       .find((el) => el.classList.contains("drag-item"));
   };
 
-  const mouseDownHandler = (ev: MouseEvent) => {
-    ev.stopPropagation();
-    if (ev.cancelable) ev.preventDefault();
-
-    const target = ev.currentTarget as HTMLElement;
-    const dragItem = getClosestItem(target) as HTMLElement;
-    if (dragItem.classList.contains("placeholder")) {
-      return;
-    }
-
-    const initX = dragItem.offsetLeft;
-    const initY = dragItem.offsetTop;
-
-    pos.current = {
-      x: initX,
-      y: initY,
-    };
-
-    const ghostItem = makeClone(dragItem);
-    areaRef.current?.appendChild(ghostItem);
-    ghostRef.current = ghostItem;
-
-    dragItem.classList.add("placeholder");
-
-    mouseMoveHandler(ev);
-
-    const mouseUpHandler = () => {
-      ghostItem.remove();
-      ghostRef.current = undefined;
-
-      dragItem.classList.remove("placeholder");
-      document.removeEventListener("mousemove", mouseMoveHandler);
-    };
-
-    document.addEventListener("mousemove", mouseMoveHandler);
-    document.addEventListener("mouseup", mouseUpHandler, {
-      once: true,
-    });
-  };
-
   const moveTarget = (target: HTMLElement, pos: { x: number; y: number }) => {
     target.style.position = "absolute";
     target.style.top = `${pos.y}px`;
@@ -84,100 +48,119 @@ export const DropArea = ({
     target.style.pointerEvents = "none";
   };
 
-  const mouseMoveHandler = (ev: MouseEvent) => {
-    const getPosInRange = (
-      curPos: { x: number; y: number },
-      boundary: HTMLElement,
-      item: HTMLElement
-    ) => {
-      const getRange = (boundary: HTMLElement, item: HTMLElement) => {
-        const boundaryRect = boundary.getBoundingClientRect();
-        const itemRect = item.getBoundingClientRect();
-        let maxX = Math.floor(
-          boundaryRect.width - boundaryMargin - itemRect.width
-        );
-        let minX = boundaryMargin;
-        let maxY = Math.floor(
-          boundaryRect.height - boundaryMargin - itemRect.height
-        );
-        let minY = boundaryMargin;
+  const mouseMoveHandler = useCallback(
+    (ev: MouseEvent) => {
+      const getPosInRange = (
+        curPos: { x: number; y: number },
+        boundary: HTMLElement,
+        item: HTMLElement
+      ) => {
+        const getRange = (boundary: HTMLElement, item: HTMLElement) => {
+          const boundaryRect = boundary.getBoundingClientRect();
+          const itemRect = item.getBoundingClientRect();
+          let maxX = Math.floor(
+            boundaryRect.width - boundaryMargin - itemRect.width
+          );
+          let minX = boundaryMargin;
+          let maxY = Math.floor(
+            boundaryRect.height - boundaryMargin - itemRect.height
+          );
+          let minY = boundaryMargin;
 
-        if (maxX <= boundaryMargin) {
-          minX = 0;
-          maxX = 0;
-        }
+          if (maxX <= boundaryMargin) {
+            minX = 0;
+            maxX = 0;
+          }
 
-        if (maxY <= boundaryMargin) {
-          minY = 0;
-          maxY = 0;
-        }
+          if (maxY <= boundaryMargin) {
+            minY = 0;
+            maxY = 0;
+          }
+          return {
+            x: [minX, maxX],
+            y: [minY, maxY],
+          };
+        };
+
+        const { x, y } = getRange(boundary, item);
         return {
-          x: [minX, maxX],
-          y: [minY, maxY],
+          x: Math.min(Math.max(curPos.x, x[0]), x[1]),
+          y: Math.min(Math.max(curPos.y, y[0]), y[1]),
         };
       };
 
-      const { x, y } = getRange(boundary, item);
-      return {
-        x: Math.min(Math.max(curPos.x, x[0]), x[1]),
-        y: Math.min(Math.max(curPos.y, y[0]), y[1]),
-      };
-    };
+      const deltaX = ev.movementX;
+      const deltaY = ev.movementY;
 
-    const deltaX = ev.movementX;
-    const deltaY = ev.movementY;
+      if (!areaRef.current || !ghostRef.current) return;
 
-    if (!areaRef.current || !ghostRef.current) return;
-
-    pos.current = getPosInRange(
-      { x: pos.current.x + deltaX, y: pos.current.y + deltaY },
-      areaRef.current,
-      ghostRef.current
-    );
-
-    moveTarget(ghostRef.current, pos.current);
-
-    const closestItem = getClosestItem(ghostRef.current) as HTMLElement;
-
-    if (closestItem && ghostRef.current.id !== closestItem.id) {
-      // 원래 위치
-
-      const items = [...areaRef.current.children].filter(
-        (el) => !el.classList.contains("ghost")
+      pos.current = getPosInRange(
+        { x: pos.current.x + deltaX, y: pos.current.y + deltaY },
+        areaRef.current,
+        ghostRef.current
       );
 
-      const fromIdx = items.findIndex(
-        (child) => child.id === ghostRef.current?.id
-      );
-      const toIdx = items.findIndex((child) => child.id === closestItem.id);
+      moveTarget(ghostRef.current, pos.current);
 
-      const originalElement = items[fromIdx] as HTMLElement;
+      const closestItem = getClosestItem(ghostRef.current) as HTMLElement;
 
-      const offsetX = originalElement.offsetLeft - closestItem.offsetLeft;
-      const offsetY = originalElement.offsetTop - closestItem.offsetTop;
+      if (closestItem && ghostRef.current.id !== closestItem.id) {
+        // 원래 위치
 
-      setItemsTransition(items, fromIdx, toIdx, { x: offsetX, y: offsetY });
+        const items = [...areaRef.current.children].filter(
+          (el) => !el.classList.contains("ghost")
+        );
 
-      const reorderElements = () => {
-        if (fromIdx < toIdx) {
-          // insert after
-          areaRef.current?.insertBefore(
-            originalElement,
-            closestItem.nextElementSibling
+        const fromIdx = items.findIndex(
+          (child) => child.id === ghostRef.current?.id
+        );
+        const toIdx = items.findIndex((child) => child.id === closestItem.id);
+
+        const originalElement = items[fromIdx] as HTMLElement;
+
+        const offsetX = originalElement.offsetLeft - closestItem.offsetLeft;
+        const offsetY = originalElement.offsetTop - closestItem.offsetTop;
+
+        setItemsTransition(items, fromIdx, toIdx, { x: offsetX, y: offsetY });
+
+        const reorderElements = () => {
+          if (fromIdx === toIdx) return;
+
+          if (fromIdx < toIdx) {
+            // insert after
+            areaRef.current?.insertBefore(
+              originalElement,
+              closestItem.nextElementSibling
+            );
+          } else if (fromIdx > toIdx) {
+            areaRef.current?.insertBefore(originalElement, closestItem);
+          }
+          const list = reorder(orderedList, fromIdx, toIdx);
+          if (typeof onChange === "function") {
+            onChange(list);
+          }
+        };
+
+        const transitionHandler = () => {
+          reorderElements();
+          items.forEach((el) => el.removeAttribute("style"));
+          originalElement.removeEventListener(
+            "transitionend",
+            transitionHandler
           );
-        } else if (fromIdx > toIdx) {
-          areaRef.current?.insertBefore(originalElement, closestItem);
-        }
-      };
+        };
 
-      const transitionHandler = () => {
-        reorderElements();
-        items.forEach((el) => el.removeAttribute("style"));
-        originalElement.removeEventListener("transitionend", transitionHandler);
-      };
+        originalElement.addEventListener("transitionend", transitionHandler);
+      }
+    },
+    [boundaryMargin, onChange, orderedList]
+  );
 
-      originalElement.addEventListener("transitionend", transitionHandler);
-    }
+  const reorder = (list: string[], fromIdx: number, toIdx: number) => {
+    const reorderedList = list;
+    const [reordered] = reorderedList.splice(fromIdx, 1);
+    reorderedList.splice(toIdx, 0, reordered);
+    return reorderedList;
   };
 
   const setItemsTransition = (
@@ -196,24 +179,70 @@ export const DropArea = ({
       startIdx = toIdx - 1;
       endIdx = fromIdx;
     }
+
+    const TRANSITION = `transform 300ms ease-in-out`;
     const originalElement = elements[fromIdx] as HTMLElement;
     originalElement.style.transform = `translate3d(${-distX}px, ${-distY}px, 0px)`;
-    originalElement.style.transition = `transform 250ms ease-in-out`;
+    originalElement.style.transition = TRANSITION;
 
     elements.forEach((el, idx) => {
       if (startIdx < idx && idx < endIdx) {
         (
           el as HTMLElement
         ).style.transform = `translate3d(${distX}px, ${distY}px, 0px)`;
-        (el as HTMLElement).style.transition = `transform 250ms ease-in-out`;
+        (el as HTMLElement).style.transition = TRANSITION;
       }
     });
   };
 
+  const mouseDownHandler = useCallback(
+    (ev: MouseEvent) => {
+      ev.stopPropagation();
+      if (ev.cancelable) ev.preventDefault();
+
+      const target = ev.currentTarget as HTMLElement;
+      const dragItem = getClosestItem(target) as HTMLElement;
+      if (dragItem.classList.contains("placeholder")) {
+        return;
+      }
+
+      const initX = dragItem.offsetLeft;
+      const initY = dragItem.offsetTop;
+
+      pos.current = {
+        x: initX,
+        y: initY,
+      };
+
+      const ghostItem = makeClone(dragItem);
+      areaRef.current?.appendChild(ghostItem);
+      ghostRef.current = ghostItem;
+
+      dragItem.classList.add("placeholder");
+
+      mouseMoveHandler(ev);
+
+      const mouseUpHandler = () => {
+        ghostItem.remove();
+        ghostRef.current = undefined;
+
+        dragItem.classList.remove("placeholder");
+        document.removeEventListener("mousemove", mouseMoveHandler);
+      };
+
+      document.addEventListener("mousemove", mouseMoveHandler);
+      document.addEventListener("mouseup", mouseUpHandler, {
+        once: true,
+      });
+    },
+    [mouseMoveHandler]
+  );
+
   useEffect(() => {
     if (areaRef.current) {
-      const dragItems = [...areaRef.current.children].filter((el) =>
-        el.classList.contains("drag-item")
+      const dragItems = [...areaRef.current.children].filter(
+        (el) =>
+          el.classList.contains("drag-item") && !el.classList.contains("ghost")
       );
       dragItems.forEach((el) => {
         const draggable = el.querySelector("[draggable=true]");
