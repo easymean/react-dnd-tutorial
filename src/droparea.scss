@@ -1,0 +1,22 @@
+.droparea {
+  position: relative;
+  display: flex;
+  width: fit-content;
+  height: fit-content;
+  flex-wrap: wrap;
+
+  gap: 10px;
+  padding: 10px;
+  background-color: grey;
+  height: 300px;
+  width: 300px;
+
+  &.vertical {
+    flex-direction: column;
+  }
+  .description {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+  }
+}

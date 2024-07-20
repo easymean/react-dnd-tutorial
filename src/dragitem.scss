@@ -1,0 +1,13 @@
+.drag-item {
+  display: flex;
+  width: fit-content;
+  height: fit-content;
+  &.ghost {
+    background-color: yellow;
+  }
+  &.placeholder {
+    opacity: 0.8;
+    pointer-events: none;
+    background-color: red;
+  }
+}
