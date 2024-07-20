@@ -1,18 +1,37 @@
+import { useState } from "react";
 import "./App.css";
 import { DragItem } from "./DragItem";
 import { DropArea } from "./DropArea";
 
 function App() {
-  const list = [0, 1, 2, 3, 4];
+  const [list, setList] = useState<string[]>([]);
+  const addList = () => {
+    const randomId = crypto.randomUUID();
+    const newList = [...list, randomId];
+    setList(newList);
+  };
+
+  const deleteList = (id: string) => {
+    const newList = [...list.filter((el) => el !== id)];
+    setList(newList);
+  };
   return (
     <>
+      <button onClick={() => addList()}>리스트 추가하기</button>
       <div>
         <DropArea>
           {list.map((el, idx) => (
-            <DragItem key={idx} id={idx.toString()}>
-              <div style={{ width: "100px", border: "1px solid red" }}>
-                <button draggable="true">{el}</button>
-                <span>{el}</span>
+            <DragItem key={el} id={el}>
+              <div
+                style={{
+                  width: "100px",
+                  border: "1px solid red",
+                  display: "flex",
+                }}
+              >
+                <button draggable="true">drag</button>
+                <span>{idx}</span>
+                <button onClick={() => deleteList(el)}>X</button>
               </div>
             </DragItem>
           ))}
