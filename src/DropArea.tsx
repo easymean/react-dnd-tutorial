@@ -231,7 +231,7 @@ export const DropArea = ({
         });
       };
     }
-  }, []);
+  });
 
   return (
     <ul ref={areaRef} className={"droparea " + direction}>
