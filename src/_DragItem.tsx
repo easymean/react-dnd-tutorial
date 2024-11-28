@@ -1,4 +1,4 @@
-import './dragitem.scss';
+import "./dragitem.scss";
 
 type Props = {
   id: string;
@@ -7,7 +7,7 @@ type Props = {
 
 export const DragItem = ({ id, children }: Props) => {
   return (
-    <li id={id} className='dragitem'>
+    <li id={id} className="drag-item">
       {children}
     </li>
   );
