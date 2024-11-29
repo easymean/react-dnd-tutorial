@@ -3,7 +3,11 @@
   width: fit-content;
   height: fit-content;
   &.ghost {
-    opacity: 0.8;
+    opacity: 0.5;
     pointer-events: none;
+    cursor: move;
+  }
+  &.dragging {
+    opacity: 0.8;
   }
 }
