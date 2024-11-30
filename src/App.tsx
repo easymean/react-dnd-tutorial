@@ -1,7 +1,7 @@
-import { useState } from "react";
-import "./App.css";
-import { DragItem } from "./DragItem";
-import { DropArea } from "./DropArea";
+import { useState } from 'react';
+import './App.css';
+import { DragItem } from './DragItem';
+import { DropArea } from './DropArea';
 
 function App() {
   const [list, setList] = useState<string[]>([]);
@@ -24,12 +24,17 @@ function App() {
             <DragItem key={el} id={el}>
               <div
                 style={{
-                  width: "100px",
-                  border: "1px solid red",
-                  display: "flex",
+                  width: '100px',
+                  height: '50px',
+                  border: '1px dashed black',
+                  borderRadius: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '5px 0',
                 }}
               >
-                <button draggable="true">drag</button>
+                <button draggable='true'>drag</button>
                 <span>{idx}</span>
                 <button onClick={() => deleteList(el)}>X</button>
               </div>

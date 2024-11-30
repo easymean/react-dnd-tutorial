@@ -1,269 +1,137 @@
 import "./droparea.scss";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 type Props = {
   children?: React.ReactNode;
   direction?: "horizontal" | "vertical";
-  boundaryMargin?: number;
-  orderedList?: any[];
-  onChange?: (orderedIds: string[]) => void;
 };
 
-export const DropArea = ({
-  children,
-  direction = "vertical",
-  boundaryMargin = 0,
-  orderedList = [],
-  onChange,
-}: Props) => {
-  const areaRef = useRef<HTMLUListElement>(null);
+export const DropArea = ({ children, direction = "vertical" }: Props) => {
+  const containerRef = useRef<HTMLUListElement>(null);
   const ghostRef = useRef<HTMLElement>();
 
-  const pos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [idList, setIdList] = useState<string[]>([]);
 
-  const makeClone = (target: HTMLElement) => {
-    const rect = target.getBoundingClientRect();
-    const cloned = target.cloneNode(true) as HTMLElement;
-    cloned.classList.add("ghost");
-    cloned.style.position = "absolute";
-    cloned.style.top = `${rect.top}px`;
-    cloned.style.left = `${rect.left}px`;
-    return cloned;
+  const makeCustomGhost = (target: Element) => {
+    const ghost = target.cloneNode(true) as HTMLElement;
+    ghost.classList.add("ghost");
+    ghost.style.transform = `scale(1.0)`;
+    ghost.style.position = "absolute";
+    ghost.style.top = "-1000px";
+    ghost.style.left = "-1000px";
+    return ghost;
   };
 
-  const getClosestItem = (target: Element) => {
-    const rect = target.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    return document
-      .elementsFromPoint(centerX, centerY)
-      .find((el) => el.classList.contains("drag-item"));
-  };
-
-  const moveTarget = (target: HTMLElement, pos: { x: number; y: number }) => {
-    target.style.position = "absolute";
-    target.style.top = `${pos.y}px`;
-    target.style.left = `${pos.x}px`;
-    target.style.pointerEvents = "none";
-  };
-
-  const mouseMoveHandler = useCallback(
-    (ev: MouseEvent) => {
-      const getPosInRange = (
-        curPos: { x: number; y: number },
-        boundary: HTMLElement,
-        item: HTMLElement
-      ) => {
-        const getRange = (boundary: HTMLElement, item: HTMLElement) => {
-          const boundaryRect = boundary.getBoundingClientRect();
-          const itemRect = item.getBoundingClientRect();
-          let maxX = Math.floor(
-            boundaryRect.width - boundaryMargin - itemRect.width
-          );
-          let minX = boundaryMargin;
-          let maxY = Math.floor(
-            boundaryRect.height - boundaryMargin - itemRect.height
-          );
-          let minY = boundaryMargin;
-
-          if (maxX <= boundaryMargin) {
-            minX = 0;
-            maxX = 0;
-          }
-
-          if (maxY <= boundaryMargin) {
-            minY = 0;
-            maxY = 0;
-          }
-          return {
-            x: [minX, maxX],
-            y: [minY, maxY],
-          };
-        };
-
-        const { x, y } = getRange(boundary, item);
-        return {
-          x: Math.min(Math.max(curPos.x, x[0]), x[1]),
-          y: Math.min(Math.max(curPos.y, y[0]), y[1]),
-        };
-      };
-
-      const deltaX = ev.movementX;
-      const deltaY = ev.movementY;
-
-      if (!areaRef.current || !ghostRef.current) return;
-
-      pos.current = getPosInRange(
-        { x: pos.current.x + deltaX, y: pos.current.y + deltaY },
-        areaRef.current,
-        ghostRef.current
-      );
-
-      moveTarget(ghostRef.current, pos.current);
-
-      const closestItem = getClosestItem(ghostRef.current) as HTMLElement;
-
-      if (closestItem && ghostRef.current.id !== closestItem.id) {
-        // 원래 위치
-
-        const items = [...areaRef.current.children].filter(
-          (el) => !el.classList.contains("ghost")
-        );
-
-        const fromIdx = items.findIndex(
-          (child) => child.id === ghostRef.current?.id
-        );
-        const toIdx = items.findIndex((child) => child.id === closestItem.id);
-
-        const originalElement = items[fromIdx] as HTMLElement;
-
-        const offsetX = originalElement.offsetLeft - closestItem.offsetLeft;
-        const offsetY = originalElement.offsetTop - closestItem.offsetTop;
-
-        setItemsTransition(items, fromIdx, toIdx, { x: offsetX, y: offsetY });
-
-        const reorderElements = () => {
-          if (fromIdx === toIdx) return;
-
-          if (fromIdx < toIdx) {
-            // insert after
-            areaRef.current?.insertBefore(
-              originalElement,
-              closestItem.nextElementSibling
-            );
-          } else if (fromIdx > toIdx) {
-            areaRef.current?.insertBefore(originalElement, closestItem);
-          }
-          const list = reorder(orderedList, fromIdx, toIdx);
-          if (typeof onChange === "function") {
-            onChange(list);
-          }
-        };
-
-        const transitionHandler = () => {
-          reorderElements();
-          items.forEach((el) => el.removeAttribute("style"));
-          originalElement.removeEventListener(
-            "transitionend",
-            transitionHandler
-          );
-        };
-
-        originalElement.addEventListener("transitionend", transitionHandler);
-      }
-    },
-    [boundaryMargin, onChange, orderedList]
-  );
-
-  const reorder = (list: string[], fromIdx: number, toIdx: number) => {
-    const reorderedList = list;
-    const [reordered] = reorderedList.splice(fromIdx, 1);
-    reorderedList.splice(toIdx, 0, reordered);
-    return reorderedList;
-  };
-
-  const setItemsTransition = (
-    elements: Element[],
-    fromIdx: number,
-    toIdx: number,
-    offset: { x: number; y: number }
-  ) => {
-    const distX = offset.x / Math.abs(toIdx - fromIdx);
-    const distY = offset.y / Math.abs(toIdx - fromIdx);
-
-    let startIdx = fromIdx;
-    let endIdx = toIdx + 1;
-
-    if (fromIdx > toIdx) {
-      startIdx = toIdx - 1;
-      endIdx = fromIdx;
+  const getDragItem = (target: Element) => {
+    if (containerRef.current && target) {
+      const dragItems = [...containerRef.current.querySelectorAll(".dragitem")];
+      const dragItem = dragItems.find((el) => el.contains(target));
+      return dragItem;
     }
-
-    const TRANSITION = `transform 300ms ease-in-out`;
-    const originalElement = elements[fromIdx] as HTMLElement;
-    originalElement.style.transform = `translate3d(${-distX}px, ${-distY}px, 0px)`;
-    originalElement.style.transition = TRANSITION;
-
-    elements.forEach((el, idx) => {
-      if (startIdx < idx && idx < endIdx) {
-        (
-          el as HTMLElement
-        ).style.transform = `translate3d(${distX}px, ${distY}px, 0px)`;
-        (el as HTMLElement).style.transition = TRANSITION;
-      }
-    });
+    return undefined;
   };
 
-  const mouseDownHandler = useCallback(
-    (ev: MouseEvent) => {
-      ev.stopPropagation();
-      if (ev.cancelable) ev.preventDefault();
+  const getOffset = (draggable: Element, item: Element) => {
+    const draggableRect = draggable.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
 
-      const target = ev.currentTarget as HTMLElement;
-      const dragItem = getClosestItem(target) as HTMLElement;
-      if (dragItem.classList.contains("placeholder")) {
-        return;
-      }
+    return {
+      x: Math.ceil(
+        draggableRect.width / 2 + draggableRect.left - itemRect.left
+      ),
+      y: Math.ceil(draggableRect.height / 2 + draggableRect.top - itemRect.top),
+    };
+  };
 
-      const initX = dragItem.offsetLeft;
-      const initY = dragItem.offsetTop;
+  const handleDragStart = (ev: DragEvent) => {
+    const draggable = ev.currentTarget as Element;
+    const dragItem = getDragItem(draggable);
+    if (!dragItem) return;
+    dragItem.classList.add("dragging");
 
-      pos.current = {
-        x: initX,
-        y: initY,
-      };
+    const ghost = makeCustomGhost(dragItem);
+    // 나중에 해제해야되기 때문에 저장
+    ghostRef.current = ghost;
+    document.body.appendChild(ghost);
 
-      const ghostItem = makeClone(dragItem);
-      areaRef.current?.appendChild(ghostItem);
-      ghostRef.current = ghostItem;
+    const { x, y } = getOffset(draggable, dragItem);
 
-      dragItem.classList.add("placeholder");
+    ev.dataTransfer?.setDragImage(ghost, x, y);
+  };
 
-      mouseMoveHandler(ev);
+  const handleDragEnd = (ev: DragEvent) => {
+    const draggable = ev.currentTarget as Element;
+    const dragItem = getDragItem(draggable);
+    if (!dragItem) return;
+    dragItem.classList.remove("dragging");
+  };
 
-      const mouseUpHandler = () => {
-        ghostItem.remove();
-        ghostRef.current = undefined;
+  const handleDragOver: React.DragEventHandler<HTMLUListElement> = (ev) => {
+    ev.preventDefault();
 
-        dragItem.classList.remove("placeholder");
-        document.removeEventListener("mousemove", mouseMoveHandler);
-      };
+    // 초기화
+    ghostRef.current?.remove();
+    ghostRef.current = undefined;
 
-      document.addEventListener("mousemove", mouseMoveHandler);
-      document.addEventListener("mouseup", mouseUpHandler, {
-        once: true,
-      });
-    },
-    [mouseMoveHandler]
-  );
+    const container = ev.currentTarget as Element;
+
+    const getClosestElement = (mouseY: number) => {
+      const dragItems = [
+        ...container.querySelectorAll(".dragitem:not(.dragging"),
+      ];
+      const result = dragItems.reduce<{
+        offset: number;
+        element: Element | undefined;
+      }>(
+        (closest, child) => {
+          const rect = child.getBoundingClientRect();
+          const offset = mouseY - rect.top - rect.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+          } else {
+            return closest;
+          }
+        },
+        { offset: Number.NEGATIVE_INFINITY, element: undefined }
+      );
+      return result.element;
+    };
+
+    const closest = getClosestElement(ev.clientY);
+    const dragging = container.querySelector(".dragging");
+    if (!dragging || !closest) return;
+
+    const items = [...container.querySelectorAll(".dragitem")];
+    const fromIdx = items.findIndex((el) => el.id === dragging.id);
+    const toIdx = items.findIndex((el) => el.id === closest.id);
+
+    if (fromIdx < toIdx) {
+      container.insertBefore(dragging, closest.nextElementSibling);
+    } else if (fromIdx > toIdx) {
+      container.insertBefore(dragging, closest);
+    }
+  };
 
   useEffect(() => {
-    if (areaRef.current) {
-      const dragItems = [...areaRef.current.children].filter(
-        (el) =>
-          el.classList.contains("drag-item") && !el.classList.contains("ghost")
-      );
+    if (containerRef.current) {
+      const dragItems = [...containerRef.current.querySelectorAll(".dragitem")];
+
       dragItems.forEach((el) => {
         const draggable = el.querySelector("[draggable=true]");
         if (draggable instanceof HTMLElement) {
-          draggable.addEventListener("mousedown", mouseDownHandler);
+          draggable.addEventListener("dragstart", handleDragStart);
+          draggable.addEventListener("dragend", handleDragEnd);
         }
       });
-
-      return () => {
-        dragItems.forEach((el) => {
-          const draggable = el.querySelector("[draggable=true]");
-          if (draggable instanceof HTMLElement) {
-            draggable.removeEventListener("mousedown", mouseDownHandler);
-          }
-        });
-      };
     }
-  }, [children, mouseDownHandler]);
+  });
 
   return (
-    <ul ref={areaRef} className={"droparea " + direction}>
+    <ul
+      ref={containerRef}
+      className={"droparea " + direction}
+      onDragOver={handleDragOver}
+    >
       {children}
     </ul>
   );
