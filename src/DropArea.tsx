@@ -1,5 +1,5 @@
 import "./droparea.scss";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   children?: React.ReactNode;
@@ -11,16 +11,10 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
   const ghostRef = useRef<HTMLElement>();
 
   const [idList, setIdList] = useState<string[]>([]);
-
-  const makeCustomGhost = (target: Element) => {
-    const ghost = target.cloneNode(true) as HTMLElement;
-    ghost.classList.add("ghost");
-    ghost.style.transform = `scale(1.0)`;
-    ghost.style.position = "absolute";
-    ghost.style.top = "-1000px";
-    ghost.style.left = "-1000px";
-    return ghost;
-  };
+  const [pos, setPos] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
 
   const getDragItem = (target: Element) => {
     if (containerRef.current && target) {
@@ -40,36 +34,54 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
     };
   };
 
-  const handleDragStart = (ev: DragEvent) => {
+  const handleMouseDown: React.MouseEventHandler<HTMLUListElement> = (ev) => {
+    setPos({
+      x: ev.clientX,
+      y: ev.clientY,
+    });
+  };
+
+  const handleDragStart = useCallback((ev: DragEvent) => {
     const draggable = ev.currentTarget as Element;
     const dragItem = getDragItem(draggable);
     if (!dragItem) return;
-    dragItem.classList.add("dragging");
+
+    const makeCustomGhost = (target: Element) => {
+      const ghost = target.cloneNode(true) as HTMLElement;
+      ghost.classList.add("ghost");
+      ghost.style.transform = `scale(1.0)`;
+      ghost.style.position = "absolute";
+      ghost.style.top = "-1000px";
+      ghost.style.left = "-1000px";
+      return ghost;
+    };
 
     const ghost = makeCustomGhost(dragItem);
     // 나중에 해제해야되기 때문에 저장
     ghostRef.current = ghost;
     document.body.appendChild(ghost);
 
-    const { x, y } = getOffset(draggable, dragItem);
+    dragItem.classList.add("dragging");
 
     const { x, y } = getOffsetBetweenInOut(draggable, dragItem);
     ev.dataTransfer?.setDragImage(ghost, x, y);
-  };
+  }, []);
 
-  const handleDragEnd = (ev: DragEvent) => {
+  const handleDragEnd = useCallback((ev: DragEvent) => {
     const draggable = ev.currentTarget as Element;
     const dragItem = getDragItem(draggable);
     if (!dragItem) return;
     dragItem.classList.remove("dragging");
-  };
+
+    if (ghostRef.current) {
+      document.body.removeChild(ghostRef.current);
+      ghostRef.current.remove();
+      ghostRef.current = undefined;
+    }
+  }, []);
 
   const handleDragOver: React.DragEventHandler<HTMLUListElement> = (ev) => {
     ev.preventDefault();
-
-    // 초기화
-    ghostRef.current?.remove();
-    ghostRef.current = undefined;
 
     const container = ev.currentTarget as Element;
 
@@ -170,6 +182,7 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
     <ul
       ref={containerRef}
       className={"droparea " + direction}
+      onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
     >
       {children}
