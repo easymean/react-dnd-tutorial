@@ -73,29 +73,61 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
 
     const container = ev.currentTarget as Element;
 
-    const getClosestElement = (mouseY: number) => {
-      const dragItems = [
-        ...container.querySelectorAll(".dragitem:not(.dragging"),
-      ];
-      const result = dragItems.reduce<{
-        offset: number;
-        element: Element | undefined;
-      }>(
-        (closest, child) => {
-          const rect = child.getBoundingClientRect();
-          const offset = mouseY - rect.top - rect.height / 2;
-          if (offset < 0 && offset > closest.offset) {
-            return { offset, element: child };
-          } else {
-            return closest;
-          }
-        },
-        { offset: Number.NEGATIVE_INFINITY, element: undefined }
-      );
-      return result.element;
-    };
+    // const getClosestElement = (getOffset: (rect: DOMRect) => number) => {
+    //   const dragItems = [
+    //     ...container.querySelectorAll(".dragitem:not(.dragging)"),
+    //   ];
+    //   const result = dragItems.reduce<{
+    //     offset: number;
+    //     element: Element | undefined;
+    //   }>(
+    //     (closest, child) => {
+    //       const rect = child.getBoundingClientRect();
+    //       const offset = getOffset(rect);
+    //       if (offset < 0 && offset > closest.offset) {
+    //         return { offset, element: child };
+    //       } else {
+    //         return closest;
+    //       }
+    //     },
+    //     { offset: Number.NEGATIVE_INFINITY, element: undefined }
+    //   );
+    //   return result.element;
+    // };
 
-    const closest = getClosestElement(ev.clientY);
+    // // dragging하는 아이템의 height, width를(correct) 고려합니다.
+    // const getBaseLine = (
+    //   prevMousePos: { x: number; y: number },
+    //   curMousePos: { x: number; y: number },
+    //   correct: { x: number; y: number }
+    // ) => {
+    //   if (direction === "horizontal") {
+    //     const delta = prevMousePos.x - curMousePos.x > 0 ? -1 : 1;
+    //     return (rect: DOMRect) =>
+    //       curMousePos.x + correct.x * delta - rect.left - rect.width / 2;
+    //   } else {
+    //     const delta = prevMousePos.y - curMousePos.y > 0 ? -1 : 1;
+    //     return (rect: DOMRect) =>
+    //       curMousePos.y + correct.y * delta - rect.top - rect.height / 2;
+    //   }
+    // };
+
+    // let correct = { x: 0, y: 0 };
+    // if (ghostRef.current) {
+    //   const draggable = ghostRef.current.querySelector(`[draggable=true]`);
+    //   if (draggable)
+    //     correct = getOffsetBetweenInOut(draggable, ghostRef.current);
+    // }
+    // const getRectOffset = getBaseLine(
+    //   pos,
+    //   { x: ev.clientX, y: ev.clientY },
+    //   correct
+    // );
+
+    // const closest = getClosestElement(getRectOffset);
+    const closest = document
+      .elementFromPoint(ev.clientX, ev.clientY)
+      ?.closest<HTMLElement>(".dragitem:not(.dragging)");
     const dragging = container.querySelector(".dragging");
     if (!dragging || !closest) return;
 
@@ -104,11 +136,19 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
     const toIdx = items.findIndex((el) => el.id === closest.id);
 
     if (fromIdx < toIdx) {
-      container.insertBefore(dragging, closest.nextElementSibling);
-    } else if (fromIdx > toIdx) {
-      container.insertBefore(dragging, closest);
+      containerRef.current?.insertBefore(closest, dragging);
+    } else {
+      containerRef.current?.insertBefore(dragging, closest);
     }
   };
+
+  // const handleContainerDragEnd: React.DragEventHandler<HTMLUListElement> =
+  //   useCallback((ev) => {
+  //     const draggable = ev.currentTarget as Element;
+  //     const dragItem = getDragItem(draggable);
+  //     if (!dragItem) return;
+  //     dragItem.classList.remove("dragging");
+  //   }, []);
 
   useEffect(() => {
     if (containerRef.current) {
