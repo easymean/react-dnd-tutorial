@@ -25,21 +25,18 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
   const getDragItem = (target: Element) => {
     if (containerRef.current && target) {
       const dragItems = [...containerRef.current.querySelectorAll(".dragitem")];
-      const dragItem = dragItems.find((el) => el.contains(target));
-      return dragItem;
+      return dragItems.find((el) => el.contains(target));
     }
     return undefined;
   };
 
-  const getOffset = (draggable: Element, item: Element) => {
-    const draggableRect = draggable.getBoundingClientRect();
-    const itemRect = item.getBoundingClientRect();
+  const getOffsetBetweenInOut = (inElement: Element, outElement: Element) => {
+    const inRect = inElement.getBoundingClientRect();
+    const outRect = outElement.getBoundingClientRect();
 
     return {
-      x: Math.ceil(
-        draggableRect.width / 2 + draggableRect.left - itemRect.left
-      ),
-      y: Math.ceil(draggableRect.height / 2 + draggableRect.top - itemRect.top),
+      x: Math.ceil(inRect.width / 2 + inRect.left - outRect.left),
+      y: Math.ceil(inRect.height / 2 + inRect.top - outRect.top),
     };
   };
 
@@ -56,6 +53,7 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
 
     const { x, y } = getOffset(draggable, dragItem);
 
+    const { x, y } = getOffsetBetweenInOut(draggable, dragItem);
     ev.dataTransfer?.setDragImage(ghost, x, y);
   };
 
@@ -114,7 +112,9 @@ export const DropArea = ({ children, direction = "vertical" }: Props) => {
 
   useEffect(() => {
     if (containerRef.current) {
-      const dragItems = [...containerRef.current.querySelectorAll(".dragitem")];
+      const dragItems = [
+        ...containerRef.current.querySelectorAll(".dragitem:not(.dragging)"),
+      ];
 
       dragItems.forEach((el) => {
         const draggable = el.querySelector("[draggable=true]");
